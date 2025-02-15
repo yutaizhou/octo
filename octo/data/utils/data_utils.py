@@ -102,7 +102,6 @@ def get_dataset_statistics(
             f"dataset_statistics_{unique_hash}.json",
         )
     )
-
     if save_dir is not None:
         path = tf.io.gfile.join(save_dir, f"dataset_statistics_{unique_hash}.json")
     else:
@@ -162,6 +161,8 @@ def get_dataset_statistics(
             "min": actions.min(0).tolist(),
             "p99": np.quantile(actions, 0.99, 0).tolist(),
             "p01": np.quantile(actions, 0.01, 0).tolist(),
+            "p999": np.quantile(actions, 0.999, 0).tolist(),
+            "p001": np.quantile(actions, 0.001, 0).tolist(),
         },
         "num_transitions": num_transitions,
         "num_trajectories": num_trajectories,
@@ -269,9 +270,13 @@ def normalize_action_and_proprio(
     if normalization_type == NormalizationType.BOUNDS:
         # normalize to [-1, 1]
         for key, traj_key in keys_to_normalize.items():
-            mask = metadata[key].get(
-                "mask", tf.ones_like(metadata[key]["p01"], dtype=tf.bool)
-            )
+            # mask = metadata[key].get(
+            #     "mask", tf.ones_like(metadata[key]["p01"], dtype=tf.bool)
+            # )
+            """
+            Note: we do not use the oxe's mask and rescale the gripper action to [-1, 1] as well
+            """
+            mask = tf.ones_like(metadata[key]["p001"], dtype=tf.bool)
             traj = dl.transforms.selective_tree_map(
                 traj,
                 match=lambda k, _: k == traj_key,
@@ -279,8 +284,8 @@ def normalize_action_and_proprio(
                     mask,
                     tf.clip_by_value(
                         2
-                        * (x - metadata[key]["p01"])
-                        / (metadata[key]["p99"] - metadata[key]["p01"] + 1e-8)
+                        * (x - metadata[key]["p001"])
+                        / (metadata[key]["p999"] - metadata[key]["p001"] + 1e-8)
                         - 1,
                         -1,
                         1,

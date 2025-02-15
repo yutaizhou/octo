@@ -154,6 +154,18 @@ def apply_trajectory_transforms(
             num_parallel_calls,
         )
 
+    def add_next_act_obs(traj: dict) -> dict:
+        traj_len = tf.shape(traj["action"])[0]
+        indices = tf.minimum(tf.range(traj_len) + 1, traj_len - 1)
+        traj["next_action"] = tf.gather(traj["action"], indices)
+        
+        traj["next_observation"] = tf.nest.map_structure(
+            lambda x: tf.gather(x, indices), traj["observation"]
+        )
+        return traj
+
+    dataset = dataset.traj_map(add_next_act_obs, num_parallel_calls)
+
     return dataset
 
 
@@ -199,6 +211,7 @@ def apply_frame_transforms(
         frame["task"] = fn(frame["task"])
         # observation is chunked -- apply fn along first axis
         frame["observation"] = dl.vmap(fn)(frame["observation"])
+        frame["next_observation"] = dl.vmap(fn)(frame["next_observation"])
         return frame
 
     # decode + resize images (and depth images)
@@ -247,7 +260,7 @@ def make_dataset_from_rlds(
     depth_obs_keys: Mapping[str, Optional[str]] = {},
     proprio_obs_key: Optional[str] = None,
     language_key: Optional[str] = None,
-    action_proprio_normalization_type: NormalizationType = NormalizationType.NORMAL,
+    action_proprio_normalization_type: NormalizationType = NormalizationType.BOUNDS,
     dataset_statistics: Optional[Union[dict, str]] = None,
     force_recompute_dataset_statistics: bool = False,
     action_normalization_mask: Optional[Sequence[bool]] = None,
@@ -256,6 +269,8 @@ def make_dataset_from_rlds(
     ignore_errors: bool = False,
     num_parallel_reads: int = tf.data.AUTOTUNE,
     num_parallel_calls: int = tf.data.AUTOTUNE,
+    discount: float = 0.98,
+    num_final_repeat: int = 3,
 ) -> Tuple[dl.DLataset, dict]:
     """This function is responsible for loading a specific RLDS dataset from storage and getting it into a
     standardized format. Yields a dataset of trajectories. Does not include CPU-intensive operations.
@@ -366,12 +381,29 @@ def make_dataset_from_rlds(
                     f"Language key {language_key} has dtype {task['language_instruction'].dtype}, "
                     "but it must be tf.string."
                 )
+        
+        num_pos = tf.minimum(num_final_repeat, traj_len)
+        reward = tf.concat(
+             [tf.zeros(traj_len - num_pos, dtype=tf.float32), tf.ones(num_pos, dtype=tf.float32)], axis=0
+        )
+        td_mask = tf.concat(
+            [tf.ones(traj_len - num_pos, dtype=tf.float32), tf.zeros(num_pos, dtype=tf.float32)], axis=0
+        )
+        mc_return = tf.scan(
+            lambda prev_return, x: x[0] + discount * prev_return * x[1],
+            [reward, td_mask],
+            initializer=0.0,
+            reverse=True
+        )
 
         traj = {
             "observation": new_obs,
             "task": task,
             "action": tf.cast(traj["action"], tf.float32),
             "dataset_name": tf.repeat(name, traj_len),
+            "reward": reward,
+            "td_mask": td_mask,
+            "mc_return": mc_return,
         }
 
         return traj
@@ -407,7 +439,6 @@ def make_dataset_from_rlds(
             force_recompute=force_recompute_dataset_statistics,
         )
     dataset_statistics = tree_map(np.array, dataset_statistics)
-
     # skip normalization for certain action dimensions
     if action_normalization_mask is not None:
         if (
