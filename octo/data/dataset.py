@@ -384,7 +384,7 @@ def make_dataset_from_rlds(
         
         num_pos = tf.minimum(num_final_repeat, traj_len)
         reward = tf.concat(
-             [tf.zeros(traj_len - num_pos, dtype=tf.float32), tf.ones(num_pos, dtype=tf.float32)], axis=0
+             [-tf.ones(traj_len - num_pos, dtype=tf.float32), tf.zeros(num_pos, dtype=tf.float32)], axis=0
         )
         td_mask = tf.concat(
             [tf.ones(traj_len - num_pos, dtype=tf.float32), tf.zeros(num_pos, dtype=tf.float32)], axis=0
