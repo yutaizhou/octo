@@ -439,6 +439,13 @@ def make_dataset_from_rlds(
             force_recompute=force_recompute_dataset_statistics,
         )
     dataset_statistics = tree_map(np.array, dataset_statistics)
+
+    if name=="bridge_dataset":
+        """
+        V-GPS comment: we override and use this heuristic to normalize the action space for the bridge dataset follwoing the PTR paper (https://arxiv.org/abs/2210.05178)
+        """
+        dataset_statistics["action"]["min"] = np.array([-0.05, -0.05, -0.05, -0.25, -0.25, -0.25, 0.])
+        dataset_statistics["action"]["max"] = np.array([0.05, 0.05, 0.05, 0.25, 0.25, 0.25, 1.])
     # skip normalization for certain action dimensions
     if action_normalization_mask is not None:
         if (
