@@ -3,14 +3,14 @@ This example shows how to use the `octo.data` dataloader with PyTorch by wrappin
 dataloader. The config below also happens to be our exact pretraining config (except for the batch size and
 shuffle buffer size, which are reduced for demonstration purposes).
 """
+
 import numpy as np
 import tensorflow as tf
 import torch
-from torch.utils.data import DataLoader
 import tqdm
-
 from octo.data.dataset import make_interleaved_dataset
 from octo.data.oxe import make_oxe_dataset_kwargs_and_weights
+from torch.utils.data import DataLoader
 
 DATA_PATH = "gs://rail-orca-central2/resize_256_256"
 

@@ -11,7 +11,6 @@ import flax
 import gym
 import jax
 import jax.numpy as jnp
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,6 +18,7 @@ import plotly.graph_objects as go
 import tensorflow as tf
 import tqdm
 import wandb
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 from octo.utils.gym_wrappers import (
     HistoryWrapper,
@@ -362,12 +362,12 @@ class RolloutVisualizer:
                     )
             if rollout_idx < n_vis_rollouts:
                 # save rollout video
-                assert (
-                    images[0].dtype == np.uint8
-                ), f"Expect uint8, got {images[0].dtype}"
-                assert (
-                    images[0].shape[-1] == 3
-                ), f"Expect [height, width, channels] format, got {images[0].shape}"
+                assert images[0].dtype == np.uint8, (
+                    f"Expect uint8, got {images[0].dtype}"
+                )
+                assert images[0].shape[-1] == 3, (
+                    f"Expect [height, width, channels] format, got {images[0].shape}"
+                )
                 if mode == "image_conditioned":
                     images = [
                         np.concatenate([task["image_primary"][0], frame], axis=0)

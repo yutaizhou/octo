@@ -1,9 +1,8 @@
-from copy import deepcopy
 import imp
 import os
+from copy import deepcopy
 
 from ml_collections import ConfigDict
-
 from octo.data.oxe.oxe_standardization_transforms import bridge_dataset_transform
 from octo.utils.spec import ModuleSpec
 

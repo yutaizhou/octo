@@ -2,11 +2,12 @@
 Contains observation-level transforms used in the octo data pipeline. These transforms operate on the
 "observation" dictionary, and are applied at a per-frame level.
 """
+
 from typing import Mapping, Optional, Tuple, Union
 
-from absl import logging
 import dlimp as dl
 import tensorflow as tf
+from absl import logging
 
 
 def augment(
@@ -61,9 +62,9 @@ def image_dropout(
     shuffle_seed, seed = tf.unstack(tf.random.split(seed))
 
     if always_keep_key:
-        assert (
-            always_keep_key in image_keys
-        ), f"Specified always_keep_key {always_keep_key} not present in image_keys: {image_keys} during dropout."
+        assert always_keep_key in image_keys, (
+            f"Specified always_keep_key {always_keep_key} not present in image_keys: {image_keys} during dropout."
+        )
         always_keep_index = tf.constant(
             image_keys.index(always_keep_key), dtype=tf.int64
         )

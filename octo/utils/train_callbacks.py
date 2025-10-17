@@ -1,21 +1,21 @@
-from dataclasses import dataclass
-from functools import partial
 import logging
 import os
+from dataclasses import dataclass
+from functools import partial
 from typing import Callable, Mapping, Optional
 
 import flax
-from flax.training import orbax_utils
 import jax
 import jax.numpy as jnp
 import numpy as np
 import orbax.checkpoint
 import tensorflow as tf
 import tqdm
+from flax.training import orbax_utils
 
 from octo.data.dataset import make_single_dataset
 from octo.data.utils.text_processing import TextProcessor
-from octo.utils.train_utils import batched_apply, TrainState
+from octo.utils.train_utils import TrainState, batched_apply
 from octo.utils.typing import Any, Data, Sequence
 from octo.utils.visualization_lib import RolloutVisualizer, Visualizer
 
@@ -373,8 +373,8 @@ class RolloutVisualizationCallback(Callback):
                 rollout_infos = rollout_visualizer.run_rollouts(
                     policy_fn, train_state, mode, n_rollouts=self.trajs_for_rollouts
                 )
-                wandb_metrics[
-                    f"rollouts_{rollout_visualizer.name}/{mode}"
-                ] = rollout_infos
+                wandb_metrics[f"rollouts_{rollout_visualizer.name}/{mode}"] = (
+                    rollout_infos
+                )
 
         return wandb_metrics

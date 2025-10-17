@@ -1,19 +1,19 @@
-from functools import partial
 import json
+from functools import partial
 from typing import Callable, Mapping, Optional, Sequence, Tuple, Union
 
-from absl import logging
 import dlimp as dl
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
+from absl import logging
 
 from octo.data import obs_transforms, traj_transforms
 from octo.data.utils import goal_relabeling, task_augmentation
 from octo.data.utils.data_utils import (
+    NormalizationType,
     allocate_threads,
     get_dataset_statistics,
-    NormalizationType,
     normalize_action_and_proprio,
     pprint_data_mixture,
     sample_match_keys_uniform,
@@ -158,7 +158,7 @@ def apply_trajectory_transforms(
         traj_len = tf.shape(traj["action"])[0]
         indices = tf.minimum(tf.range(traj_len) + 1, traj_len - 1)
         traj["next_action"] = tf.gather(traj["action"], indices)
-        
+
         traj["next_observation"] = tf.nest.map_structure(
             lambda x: tf.gather(x, indices), traj["observation"]
         )
@@ -381,19 +381,27 @@ def make_dataset_from_rlds(
                     f"Language key {language_key} has dtype {task['language_instruction'].dtype}, "
                     "but it must be tf.string."
                 )
-        
+
         num_pos = tf.minimum(num_final_repeat, traj_len)
         reward = tf.concat(
-             [-tf.ones(traj_len - num_pos, dtype=tf.float32), tf.zeros(num_pos, dtype=tf.float32)], axis=0
+            [
+                -tf.ones(traj_len - num_pos, dtype=tf.float32),
+                tf.zeros(num_pos, dtype=tf.float32),
+            ],
+            axis=0,
         )
         td_mask = tf.concat(
-            [tf.ones(traj_len - num_pos, dtype=tf.float32), tf.zeros(num_pos, dtype=tf.float32)], axis=0
+            [
+                tf.ones(traj_len - num_pos, dtype=tf.float32),
+                tf.zeros(num_pos, dtype=tf.float32),
+            ],
+            axis=0,
         )
         mc_return = tf.scan(
             lambda prev_return, x: x[0] + discount * prev_return * x[1],
             [reward, td_mask],
             initializer=0.0,
-            reverse=True
+            reverse=True,
         )
 
         traj = {
@@ -440,12 +448,16 @@ def make_dataset_from_rlds(
         )
     dataset_statistics = tree_map(np.array, dataset_statistics)
 
-    if name=="bridge_dataset":
+    if name == "bridge_dataset":
         """
         V-GPS comment: we override and use this heuristic to normalize the action space for the bridge dataset follwoing the PTR paper (https://arxiv.org/abs/2210.05178)
         """
-        dataset_statistics["action"]["min"] = np.array([-0.05, -0.05, -0.05, -0.25, -0.25, -0.25, 0.])
-        dataset_statistics["action"]["max"] = np.array([0.05, 0.05, 0.05, 0.25, 0.25, 0.25, 1.])
+        dataset_statistics["action"]["min"] = np.array(
+            [-0.05, -0.05, -0.05, -0.25, -0.25, -0.25, 0.0]
+        )
+        dataset_statistics["action"]["max"] = np.array(
+            [0.05, 0.05, 0.05, 0.25, 0.25, 0.25, 1.0]
+        )
     # skip normalization for certain action dimensions
     if action_normalization_mask is not None:
         if (
@@ -572,9 +584,9 @@ def make_interleaved_dataset(
     for dataset_kwargs in dataset_kwargs_list:
         _, dataset_statistics = make_dataset_from_rlds(**dataset_kwargs, train=train)
         dataset_sizes.append(dataset_statistics["num_transitions"])
-        assert (
-            dataset_kwargs["name"] not in all_dataset_statistics
-        ), f"Duplicate name {dataset_kwargs['name']}"
+        assert dataset_kwargs["name"] not in all_dataset_statistics, (
+            f"Duplicate name {dataset_kwargs['name']}"
+        )
         all_dataset_statistics[dataset_kwargs["name"]] = dataset_statistics
 
     # balance and normalize weights

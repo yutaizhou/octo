@@ -1,6 +1,6 @@
-from copy import deepcopy
 import imp
 import os
+from copy import deepcopy
 
 from ml_collections import ConfigDict, FieldReference
 

@@ -15,14 +15,15 @@ To run this script, run:
     cd examples
     python3 03_eval_finetuned.py --finetuned_path=<path_to_finetuned_aloha_checkpoint>
 """
-from functools import partial
-import sys
 
-from absl import app, flags, logging
+import sys
+from functools import partial
+
 import gym
 import jax
 import numpy as np
 import wandb
+from absl import app, flags, logging
 
 sys.path.append("path/to/your/act")
 

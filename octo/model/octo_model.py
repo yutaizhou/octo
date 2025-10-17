@@ -1,18 +1,18 @@
-from functools import partial
 import json
 import logging
+from functools import partial
 from typing import Any, Optional, Tuple
 
 import flax
-from flax import struct
-from flax.training import orbax_utils
 import jax
-from jax.experimental import multihost_utils
 import jax.numpy as jnp
-from jax.typing import ArrayLike
 import numpy as np
 import orbax.checkpoint
 import tensorflow as tf
+from flax import struct
+from flax.training import orbax_utils
+from jax.experimental import multihost_utils
+from jax.typing import ArrayLike
 
 from octo.data.utils.data_utils import NormalizationType
 from octo.data.utils.text_processing import TextProcessor

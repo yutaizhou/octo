@@ -1,6 +1,5 @@
 from ml_collections import ConfigDict
 from ml_collections.config_dict import FieldReference, placeholder
-
 from octo.utils.spec import ModuleSpec
 
 
@@ -154,9 +153,9 @@ def get_config(config_string="full,multimodal"):
         ),
     )
     # If the default data loading speed is too slow, try these:
-    config[
-        "frame_transform_threads"
-    ] = 16  # for the most CPU-intensive ops (decoding, resizing, augmenting)
+    config["frame_transform_threads"] = (
+        16  # for the most CPU-intensive ops (decoding, resizing, augmenting)
+    )
 
     config["traj_transform_kwargs"] = traj_transform_kwargs
     config["frame_transform_kwargs"] = frame_transform_kwargs

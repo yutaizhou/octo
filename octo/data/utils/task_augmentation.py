@@ -4,8 +4,8 @@ Contains basic logic for randomly zero-ing out keys in the task specification.
 
 import pickle
 
-from huggingface_hub import hf_hub_download
 import tensorflow as tf
+from huggingface_hub import hf_hub_download
 
 from octo.data.utils.data_utils import to_padding
 

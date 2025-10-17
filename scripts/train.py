@@ -4,21 +4,20 @@ import tensorflow as tf
 # isort: split
 
 import datetime
-from functools import partial
 import os
 import os.path as osp
+from functools import partial
 
-from absl import app, flags, logging
-from flax.traverse_util import flatten_dict
 import jax
-from jax.experimental import multihost_utils
-from jax.sharding import Mesh, NamedSharding, PartitionSpec
-from ml_collections import config_flags
+import octo
 import optax
 import tqdm
 import wandb
-
-import octo
+from absl import app, flags, logging
+from flax.traverse_util import flatten_dict
+from jax.experimental import multihost_utils
+from jax.sharding import Mesh, NamedSharding, PartitionSpec
+from ml_collections import config_flags
 from octo.data.dataset import make_interleaved_dataset
 from octo.data.oxe import make_oxe_dataset_kwargs_and_weights
 from octo.model.octo_model import OctoModel
@@ -31,12 +30,12 @@ from octo.utils.train_callbacks import (
     VisualizationCallback,
 )
 from octo.utils.train_utils import (
+    Timer,
+    TrainState,
     create_optimizer,
     filter_eval_datasets,
     format_name_with_config,
     process_text,
-    Timer,
-    TrainState,
 )
 from octo.utils.typing import Data
 

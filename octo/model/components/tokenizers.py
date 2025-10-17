@@ -6,8 +6,8 @@ import flax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-from jax.scipy.stats import norm
 import numpy as np
+from jax.scipy.stats import norm
 
 from octo.model.components.base import TokenGroup
 from octo.model.components.transformer import MAPHead
@@ -204,9 +204,9 @@ class LanguageTokenizer(nn.Module):
             return None
 
         if not isinstance(tasks["language_instruction"], (jax.Array, np.ndarray)):
-            assert (
-                self.encoder is not None
-            ), "Received language tokens but no encoder specified."
+            assert self.encoder is not None, (
+                "Received language tokens but no encoder specified."
+            )
             tokens = self.hf_model(**tasks["language_instruction"]).last_hidden_state
         else:
             # add a # tokens dimension to language
@@ -300,9 +300,9 @@ class LowdimObsTokenizer(BinTokenizer):
         tokenizer_inputs = []
         for o_key in self.obs_keys:
             for key in filter(re.compile(o_key).match, sorted(observations.keys())):
-                assert (
-                    len(observations[key].shape) == 3
-                ), f"Only supports non-spatial inputs but {key} has shape {observations[key].shape}."
+                assert len(observations[key].shape) == 3, (
+                    f"Only supports non-spatial inputs but {key} has shape {observations[key].shape}."
+                )
                 tokenizer_inputs.append(observations[key])
         tokenizer_inputs = jnp.concatenate(tokenizer_inputs, axis=-1)
         if self.discretize:

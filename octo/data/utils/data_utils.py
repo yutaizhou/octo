@@ -1,9 +1,9 @@
-from enum import Enum
-from fnmatch import fnmatch
 import hashlib
 import json
 import logging
 import os
+from enum import Enum
+from fnmatch import fnmatch
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import dlimp as dl
@@ -427,9 +427,9 @@ def allocate_threads(n: Optional[int], weights: np.ndarray):
         return np.array([tf.data.AUTOTUNE] * len(weights))
 
     assert np.all(weights >= 0), "Weights must be non-negative"
-    assert (
-        len(weights) <= n
-    ), "Number of threads must be at least as large as length of weights"
+    assert len(weights) <= n, (
+        "Number of threads must be at least as large as length of weights"
+    )
     weights = np.array(weights) / np.sum(weights)
 
     allocation = np.zeros_like(weights, dtype=int)

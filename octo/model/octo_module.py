@@ -121,9 +121,9 @@ class OctoTransformer(nn.Module):
         # Check that all inputs are valid
         #
 
-        assert set(readouts).issubset(
-            set(self.readouts.keys())
-        ), "readouts must be specified in the model config"
+        assert set(readouts).issubset(set(self.readouts.keys())), (
+            "readouts must be specified in the model config"
+        )
 
         batch_size, horizon = jax.tree_util.tree_leaves(observations)[0].shape[:2]
         assert horizon <= self.max_horizon, "horizon must be <= max_horizon"
@@ -270,9 +270,9 @@ class OctoTransformer(nn.Module):
             )
 
         # Run the transformer!
-        assert (
-            self.transformer_kwargs.get("add_position_embedding", False) is False
-        ), "Already added positional embeddings to the tokens"
+        assert self.transformer_kwargs.get("add_position_embedding", False) is False, (
+            "Already added positional embeddings to the tokens"
+        )
 
         prefix_outputs, timestep_outputs = BlockTransformer(
             self.transformer_kwargs, use_correct_attention=self.use_correct_attention

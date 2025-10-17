@@ -30,7 +30,7 @@ class AddPositionEmbs(nn.Module):
         """
         # inputs.shape is (batch_size, seq_len, emb_dim).
         assert inputs.ndim == 3, (
-            "Number of dimensions should be 3," " but it is: %d" % inputs.ndim
+            "Number of dimensions should be 3, but it is: %d" % inputs.ndim
         )
         pos_emb_shape = (1, inputs.shape[1], inputs.shape[2])
         pe = self.param("pos_embedding", self.posemb_init, pos_emb_shape)
@@ -44,9 +44,9 @@ class MlpBlock(nn.Module):
     dtype: Dtype = jnp.float32
     out_dim: Optional[int] = None
     dropout_rate: float = 0.1
-    kernel_init: Callable[
-        [PRNGKey, Shape, Dtype], jax.Array
-    ] = nn.initializers.xavier_uniform()
+    kernel_init: Callable[[PRNGKey, Shape, Dtype], jax.Array] = (
+        nn.initializers.xavier_uniform()
+    )
     bias_init: Callable[[PRNGKey, Shape, Dtype], jax.Array] = nn.initializers.normal(
         stddev=1e-6
     )

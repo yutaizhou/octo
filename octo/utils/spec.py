@@ -1,5 +1,5 @@
-from functools import partial
 import importlib
+from functools import partial
 from typing import Any, Dict, Tuple, TypedDict, Union
 
 
@@ -36,7 +36,9 @@ class ModuleSpec(TypedDict):
     kwargs: Dict[str, Any]
 
     @staticmethod
-    def create(callable_or_full_name: Union[str, callable], *args, **kwargs) -> "ModuleSpec":  # type: ignore
+    def create(
+        callable_or_full_name: Union[str, callable], *args, **kwargs
+    ) -> "ModuleSpec":  # type: ignore
         """Create a module spec from a callable or import string.
 
         Args:

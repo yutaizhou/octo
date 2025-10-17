@@ -1,13 +1,13 @@
-from abc import ABC, abstractmethod
 import logging
+from abc import ABC, abstractmethod
 from typing import Dict, Optional, Tuple
 
 import distrax
-from einops import rearrange
 import flax.linen as nn
 import jax
-from jax import Array
 import jax.numpy as jnp
+from einops import rearrange
+from jax import Array
 from jax.typing import ArrayLike
 
 from octo.model.components.base import TokenGroup
@@ -285,9 +285,9 @@ class DiscreteActionHead(nn.Module, ActionHead):
             embeddings = self.map_head(token_group, train=train)
         else:
             embeddings = token_group.tokens
-            assert (
-                embeddings.shape[-2] == self.n_tokens
-            ), f"Discrete action head expects {self.n_tokens} tokens"
+            assert embeddings.shape[-2] == self.n_tokens, (
+                f"Discrete action head expects {self.n_tokens} tokens"
+            )
 
         # Now, embeddings is (batch_size, window_size, n_tokens, embedding_size)
         batch_size, window_size = embeddings.shape[:2]

@@ -3,10 +3,10 @@ import os
 from typing import Any, Optional, Sequence
 
 import jax
-from jax.experimental import multihost_utils
-from jax.experimental.compilation_cache import compilation_cache
 import jax.numpy as jnp
 import numpy as np
+from jax.experimental import multihost_utils
+from jax.experimental.compilation_cache import compilation_cache
 
 
 def host_broadcast_str(x: str) -> str:

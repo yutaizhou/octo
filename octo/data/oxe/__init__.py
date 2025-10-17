@@ -2,7 +2,7 @@ import copy
 import logging
 from typing import Any, Dict, List, Sequence, Tuple, Union
 
-from octo.data.oxe.oxe_dataset_configs import ActionEncoding, OXE_DATASET_CONFIGS
+from octo.data.oxe.oxe_dataset_configs import OXE_DATASET_CONFIGS, ActionEncoding
 from octo.data.oxe.oxe_dataset_mixes import OXE_NAMED_MIXES
 from octo.data.oxe.oxe_standardization_transforms import OXE_STANDARDIZATION_TRANSFORMS
 from octo.data.utils.data_utils import NormalizationType
@@ -83,9 +83,9 @@ def make_oxe_dataset_kwargs(
     if load_language:
         dataset_kwargs["language_key"] = "language_instruction"
 
-    dataset_kwargs[
-        "action_proprio_normalization_type"
-    ] = action_proprio_normalization_type
+    dataset_kwargs["action_proprio_normalization_type"] = (
+        action_proprio_normalization_type
+    )
 
     del dataset_kwargs["proprio_encoding"]
     del dataset_kwargs["action_encoding"]

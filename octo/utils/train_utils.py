@@ -1,18 +1,18 @@
+import logging
+import time
 from collections import defaultdict
 from contextlib import contextmanager
 from fnmatch import fnmatch
-import logging
-import time
 from typing import Callable, List, Optional
 
 import flax
-from flax import struct
 import jax
-from jax.experimental import multihost_utils
 import jax.numpy as jnp
-from ml_collections import ConfigDict
 import numpy as np
 import optax
+from flax import struct
+from jax.experimental import multihost_utils
+from ml_collections import ConfigDict
 
 from octo.data.utils.text_processing import TextProcessor
 from octo.model.octo_model import OctoModel

@@ -1,18 +1,17 @@
 import datetime
-from functools import partial
 import os
+from functools import partial
 
-from absl import app, flags, logging
 import flax
-from flax.traverse_util import flatten_dict
 import jax
-from jax.sharding import Mesh, NamedSharding, PartitionSpec
-from ml_collections import config_flags, ConfigDict
 import optax
 import tensorflow as tf
 import tqdm
 import wandb
-
+from absl import app, flags, logging
+from flax.traverse_util import flatten_dict
+from jax.sharding import Mesh, NamedSharding, PartitionSpec
+from ml_collections import ConfigDict, config_flags
 from octo.data.dataset import make_single_dataset
 from octo.model.octo_model import OctoModel
 from octo.utils.jax_utils import initialize_compilation_cache
@@ -24,13 +23,13 @@ from octo.utils.train_callbacks import (
     VisualizationCallback,
 )
 from octo.utils.train_utils import (
+    Timer,
+    TrainState,
     check_config_diff,
     create_optimizer,
     format_name_with_config,
     merge_params,
     process_text,
-    Timer,
-    TrainState,
 )
 
 try:
@@ -70,7 +69,7 @@ def main(_):
         Finetuning Mode: {FLAGS.config.finetuning_mode}
 
         # Devices: {jax.device_count()}
-        Batch size: {FLAGS.config.batch_size} ({FLAGS.config.batch_size // len(devices) } per device)
+        Batch size: {FLAGS.config.batch_size} ({FLAGS.config.batch_size // len(devices)} per device)
         # Steps: {FLAGS.config.num_steps}
     """
     )
@@ -81,12 +80,12 @@ def main(_):
     #
     #########
 
-    assert (
-        FLAGS.config.batch_size % len(devices) == 0
-    ), f"Batch size ({FLAGS.config.batch_size}) must be divisible by the number of devices ({len(devices)})"
-    assert (
-        FLAGS.config.viz_kwargs.eval_batch_size % len(devices) == 0
-    ), f"Eval batch size ({FLAGS.config.viz_kwargs.eval_batch_size}) must be divisible by the number of devices ({len(devices)})"
+    assert FLAGS.config.batch_size % len(devices) == 0, (
+        f"Batch size ({FLAGS.config.batch_size}) must be divisible by the number of devices ({len(devices)})"
+    )
+    assert FLAGS.config.viz_kwargs.eval_batch_size % len(devices) == 0, (
+        f"Eval batch size ({FLAGS.config.viz_kwargs.eval_batch_size}) must be divisible by the number of devices ({len(devices)})"
+    )
 
     # create a 1D mesh with a single axis named "batch"
     mesh = Mesh(jax.devices(), axis_names="batch")

@@ -1,7 +1,7 @@
 # Written by Dibya
+import logging
 from enum import Enum
 from fnmatch import fnmatch
-import logging
 from typing import Any, Dict, Mapping, Sequence, Tuple, Union
 
 import einops
@@ -42,9 +42,9 @@ class PrefixGroup(TokenGroup):
     attention_rules: Mapping[str, AttentionRule]
 
     def __post_init__(self):
-        assert (
-            len(self.tokens.shape) == 3
-        ), "PrefixGroup tokens must be (batch, n_tokens, d)"
+        assert len(self.tokens.shape) == 3, (
+            "PrefixGroup tokens must be (batch, n_tokens, d)"
+        )
         assert len(self.mask.shape) == 2, "PrefixGroup mask must be (batch, n_tokens)"
 
 
@@ -59,12 +59,12 @@ class TimestepGroup(TokenGroup):
     attention_rules: Mapping[str, AttentionRule] = flax.struct.field(pytree_node=False)
 
     def __post_init__(self):
-        assert (
-            len(self.tokens.shape) == 4
-        ), "TimestepGroup tokens must be (batch, horizon, n_tokens, d)"
-        assert (
-            len(self.mask.shape) == 3
-        ), "TimestepGroup mask must be (batch, horizon, n_tokens)"
+        assert len(self.tokens.shape) == 4, (
+            "TimestepGroup tokens must be (batch, horizon, n_tokens, d)"
+        )
+        assert len(self.mask.shape) == 3, (
+            "TimestepGroup mask must be (batch, horizon, n_tokens)"
+        )
 
 
 def find_match(pattern_dict: Dict[str, Any], name: str, default: Any) -> Any:
@@ -387,7 +387,9 @@ class BlockTransformer(nn.Module):
                 assert (
                     prefix_group.attention_rules.get(ts_group.name, AttentionRule.NEVER)
                     == AttentionRule.NEVER
-                ), f"Causality broken! Prefix group {prefix_group.name} is attending to timestep group {ts_group.name}"
+                ), (
+                    f"Causality broken! Prefix group {prefix_group.name} is attending to timestep group {ts_group.name}"
+                )
 
         # Next, make sure that nothing is attending to future timesteps
         for group in prefix_groups + timestep_groups:
@@ -395,9 +397,9 @@ class BlockTransformer(nn.Module):
                 rule = find_match(
                     group.attention_rules, other_group.name, AttentionRule.NEVER
                 )
-                assert (
-                    rule != AttentionRule.ALL
-                ), "Causality broken! WhenToAttend.ALL attends to future timesteps too."
+                assert rule != AttentionRule.ALL, (
+                    "Causality broken! WhenToAttend.ALL attends to future timesteps too."
+                )
 
     def pretty_print_attention_mask(
         self,

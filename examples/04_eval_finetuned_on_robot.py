@@ -6,24 +6,23 @@ If you wish, you may reproduce these results by [reproducing the robot setup](ht
 and installing [the robot controller](https://github.com/rail-berkeley/bridge_data_robot)
 """
 
-from datetime import datetime
-from functools import partial
 import os
 import time
+from datetime import datetime
+from functools import partial
 
-from absl import app, flags, logging
 import click
 import cv2
-from envs.widowx_env import convert_obs, state_to_eep, wait_for_obs, WidowXGym
 import imageio
 import jax
 import jax.numpy as jnp
 import numpy as np
-from widowx_envs.widowx_env_service import WidowXClient, WidowXConfigs, WidowXStatus
-
+from absl import app, flags, logging
+from envs.widowx_env import WidowXGym, convert_obs, state_to_eep, wait_for_obs
 from octo.model.octo_model import OctoModel
 from octo.utils.gym_wrappers import HistoryWrapper, TemporalEnsembleWrapper
 from octo.utils.train_callbacks import supply_rng
+from widowx_envs.widowx_env_service import WidowXClient, WidowXConfigs, WidowXStatus
 
 np.set_printoptions(suppress=True)
 

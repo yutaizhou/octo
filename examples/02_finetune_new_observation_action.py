@@ -6,14 +6,14 @@ To run this example, first download and extract the dataset from here: https://r
 
 python examples/02_finetune_new_observation_action.py --pretrained_path=hf://rail-berkeley/octo-small-1.5 --data_dir=...
 """
-from absl import app, flags, logging
+
 import flax
 import jax
 import optax
 import tensorflow as tf
 import tqdm
 import wandb
-
+from absl import app, flags, logging
 from octo.data.dataset import make_single_dataset
 from octo.model.components.action_heads import L1ActionHead
 from octo.model.components.tokenizers import LowdimObsTokenizer
@@ -21,10 +21,10 @@ from octo.model.octo_model import OctoModel
 from octo.utils.jax_utils import initialize_compilation_cache
 from octo.utils.spec import ModuleSpec
 from octo.utils.train_utils import (
+    TrainState,
     freeze_weights,
     merge_params,
     process_text,
-    TrainState,
 )
 
 FLAGS = flags.FLAGS
@@ -44,9 +44,9 @@ flags.DEFINE_bool(
 
 
 def main(_):
-    assert (
-        FLAGS.batch_size % jax.device_count() == 0
-    ), "Batch size must be divisible by device count."
+    assert FLAGS.batch_size % jax.device_count() == 0, (
+        "Batch size must be divisible by device count."
+    )
 
     initialize_compilation_cache()
     # prevent tensorflow from using GPU memory since it's only used for data loading

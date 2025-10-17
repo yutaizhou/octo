@@ -9,8 +9,8 @@ Encoders more suitable for ViT architectures.
 import functools as ft
 from typing import Callable, Sequence, TypeVar
 
-from flax import linen as nn
 import jax.numpy as jnp
+from flax import linen as nn
 
 from octo.model.components.film_conditioning_layer import FilmConditioning
 
@@ -73,9 +73,9 @@ class PatchEncoder(nn.Module):
     def __call__(self, observations: jnp.ndarray, train: bool = True, cond_var=None):
         expecting_cond_var = self.use_film
         received_cond_var = cond_var is not None
-        assert (
-            expecting_cond_var == received_cond_var
-        ), "Only pass in cond var iff model expecting cond var"
+        assert expecting_cond_var == received_cond_var, (
+            "Only pass in cond var iff model expecting cond var"
+        )
         x = normalize_images(observations, self.img_norm_type)
         x = nn.Conv(
             features=self.num_features,
@@ -110,9 +110,9 @@ class SmallStem(nn.Module):
     def __call__(self, observations: jnp.ndarray, train: bool = True, cond_var=None):
         expecting_cond_var = self.use_film
         received_cond_var = cond_var is not None
-        assert (
-            expecting_cond_var == received_cond_var
-        ), "Only pass in cond var iff model expecting cond var"
+        assert expecting_cond_var == received_cond_var, (
+            "Only pass in cond var iff model expecting cond var"
+        )
 
         x = normalize_images(observations, self.img_norm_type)
         for n, (kernel_size, stride, features, padding) in enumerate(
@@ -221,9 +221,9 @@ class ViTResnet(nn.Module):
     def __call__(self, observations: jnp.ndarray, train: bool = True, cond_var=None):
         expecting_cond_var = self.use_film
         received_cond_var = cond_var is not None
-        assert (
-            expecting_cond_var == received_cond_var
-        ), "Only pass in cond var iff model expecting cond var"
+        assert expecting_cond_var == received_cond_var, (
+            "Only pass in cond var iff model expecting cond var"
+        )
 
         x = normalize_images(observations, self.img_norm_type)
         width = int(64 * self.width)
@@ -253,9 +253,9 @@ class ViTResnet(nn.Module):
                     name=f"block{i + 1}",
                 )(x)
                 if self.use_film:
-                    assert (
-                        cond_var is not None
-                    ), "Cond var is None, nothing to condition on"
+                    assert cond_var is not None, (
+                        "Cond var is None, nothing to condition on"
+                    )
                     x = FilmConditioning()(x, cond_var)
         else:
             if self.use_film:

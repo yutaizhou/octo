@@ -1,5 +1,5 @@
-from collections import deque
 import logging
+from collections import deque
 from typing import Dict, Optional, Sequence, Tuple
 
 import gym
@@ -216,9 +216,9 @@ class ResizeImageWrapper(gym.ObservationWrapper):
         avg_ratio: float = 1.0,
     ):
         super().__init__(env)
-        assert isinstance(
-            self.observation_space, gym.spaces.Dict
-        ), "Only Dict observation spaces are supported."
+        assert isinstance(self.observation_space, gym.spaces.Dict), (
+            "Only Dict observation spaces are supported."
+        )
         spaces = self.observation_space.spaces
         self.resize_size = resize_size
         self.augmented_keys = augmented_keys
