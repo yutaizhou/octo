@@ -154,6 +154,7 @@ def apply_trajectory_transforms(
             num_parallel_calls,
         )
 
+    # v-gps: for offline RL training (s,a,r,s',a')
     def add_next_act_obs(traj: dict) -> dict:
         traj_len = tf.shape(traj["action"])[0]
         indices = tf.minimum(tf.range(traj_len) + 1, traj_len - 1)
@@ -256,6 +257,7 @@ def make_dataset_from_rlds(
     train: bool,
     standardize_fn: Optional[ModuleSpec] = None,
     shuffle: bool = True,
+    shuffle_buffer_size: int = 1000,
     image_obs_keys: Mapping[str, Optional[str]] = {},
     depth_obs_keys: Mapping[str, Optional[str]] = {},
     proprio_obs_key: Optional[str] = None,
@@ -351,6 +353,7 @@ def make_dataset_from_rlds(
             )
 
         # extracts images, depth images and proprio from the "observation" dict
+        # note that "action" here is concatenation of raw action data ONLY AFTER applying standardization_fn from `octo/data/oxe/oxe_standardization_transforms.py`
         traj_len = tf.shape(traj["action"])[0]
         old_obs = traj["observation"]
         new_obs = {}
@@ -371,6 +374,9 @@ def make_dataset_from_rlds(
 
         # add timestep info
         new_obs["timestep"] = tf.range(traj_len)
+        new_obs["episode_id"] = (
+            traj["episode_id"] if "episode_id" in traj else tf.repeat(-1, traj_len)
+        )
 
         # extracts `language_key` into the "task" dict, or samples uniformly if `language_key` fnmatches multiple keys
         task = {}
@@ -382,6 +388,7 @@ def make_dataset_from_rlds(
                     "but it must be tf.string."
                 )
 
+        # v-gps: reward, td_mask, mc_return for offline RL training
         num_pos = tf.minimum(num_final_repeat, traj_len)
         reward = tf.concat(
             [
@@ -421,7 +428,7 @@ def make_dataset_from_rlds(
 
     builder = tfds.builder(name, data_dir=data_dir)
 
-    # load or compute dataset statistics
+    # * dataset statistics: load from file, cache, or compute from scratch
     if isinstance(dataset_statistics, str):
         with tf.io.gfile.GFile(dataset_statistics, "r") as f:
             dataset_statistics = json.load(f)
@@ -470,15 +477,29 @@ def make_dataset_from_rlds(
             )
         dataset_statistics["action"]["mask"] = np.array(action_normalization_mask)
 
-    # construct the dataset
+    # * construct the dataset
     if "val" not in builder.info.splits:
         split = "train[:95%]" if train else "train[95%:]"
     else:
         split = "train" if train else "val"
 
     dataset = dl.DLataset.from_rlds(
-        builder, split=split, shuffle=shuffle, num_parallel_reads=num_parallel_reads
-    )
+        builder,
+        split=split,
+        shuffle=False,
+        num_parallel_reads=num_parallel_reads,
+    )  # note that shuffle here is only for files, not for trajectories
+
+    def add_episode_id(idx: int, traj: dict) -> dict:
+        """
+        for dinov3 inference. using `is_first` from raw tfrecords before `restructure` is applied
+        """
+        traj_len = tf.shape(traj["is_first"])[0]
+        traj["episode_id"] = tf.repeat(idx, traj_len)
+        return traj
+
+    dataset = dataset.enumerate().traj_map(add_episode_id, num_parallel_calls)
+    dataset = dataset.shuffle(shuffle_buffer_size) if shuffle else dataset
     for filter_fcn_spec in filter_functions:
         dataset = dataset.filter(ModuleSpec.instantiate(filter_fcn_spec))
     if ignore_errors:
@@ -509,6 +530,7 @@ def make_single_dataset(
     dataset_kwargs: dict,
     *,
     train: bool,
+    shuffle: bool = True,
     traj_transform_kwargs: dict = {},
     frame_transform_kwargs: dict = {},
 ) -> dl.DLataset:
@@ -523,6 +545,7 @@ def make_single_dataset(
     dataset, dataset_statistics = make_dataset_from_rlds(
         **dataset_kwargs,
         train=train,
+        shuffle=shuffle,
     )
     dataset = apply_trajectory_transforms(dataset, **traj_transform_kwargs, train=train)
     dataset = apply_frame_transforms(dataset, **frame_transform_kwargs, train=train)
