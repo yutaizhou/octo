@@ -120,6 +120,7 @@ def get_dataset_statistics(
             metadata = json.load(f)
         return metadata
 
+    # * compute from scratch
     dataset = dataset.traj_map(
         lambda traj: {
             "action": traj["action"],
@@ -176,6 +177,8 @@ def get_dataset_statistics(
             "min": proprios.min(0).tolist(),
             "p99": np.quantile(proprios, 0.99, 0).tolist(),
             "p01": np.quantile(proprios, 0.01, 0).tolist(),
+            "p999": np.quantile(proprios, 0.999, 0).tolist(),
+            "p001": np.quantile(proprios, 0.001, 0).tolist(),
         }
 
     try:

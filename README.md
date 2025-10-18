@@ -1,3 +1,6 @@
+Yutai's version of Octo, modified for caching dinov3 embeddings. Which is in turn a fork of [V-GPS' Octo](https://github.com/nakamotoo/octo/tree/38b9b7649a7ffaf77c5ff8d1d6041ced3d157b28) modified to do RL by adding (s',a') tuples. 
+
+
 # Octo
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/octo-models/octo/blob/main/examples/01_inference_pretrained.ipynb)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
