@@ -257,7 +257,6 @@ def make_dataset_from_rlds(
     train: bool,
     standardize_fn: Optional[ModuleSpec] = None,
     shuffle: bool = True,
-    shuffle_buffer_size: int = 1000,
     image_obs_keys: Mapping[str, Optional[str]] = {},
     depth_obs_keys: Mapping[str, Optional[str]] = {},
     proprio_obs_key: Optional[str] = None,
@@ -374,9 +373,6 @@ def make_dataset_from_rlds(
 
         # add timestep info
         new_obs["timestep"] = tf.range(traj_len)
-        new_obs["episode_id"] = (
-            traj["episode_id"] if "episode_id" in traj else tf.repeat(-1, traj_len)
-        )
 
         # extracts `language_key` into the "task" dict, or samples uniformly if `language_key` fnmatches multiple keys
         task = {}
@@ -414,6 +410,7 @@ def make_dataset_from_rlds(
         traj = {
             "observation": new_obs,
             "task": task,
+            "tfds_id": traj["tfds_id"],
             "action": tf.cast(traj["action"], tf.float32),
             "dataset_name": tf.repeat(name, traj_len),
             "reward": reward,
@@ -467,13 +464,11 @@ def make_dataset_from_rlds(
         )
     # skip normalization for certain action dimensions
     if action_normalization_mask is not None:
-        if (
-            len(action_normalization_mask)
-            != dataset_statistics["action"]["mean"].shape[-1]
-        ):
+        action_dim = dataset_statistics["action"]["mean"].shape[-1]
+        if len(action_normalization_mask) != action_dim:
             raise ValueError(
                 f"Length of skip_normalization_mask ({len(action_normalization_mask)}) "
-                f"does not match action dimension ({dataset_statistics['action']['mean'].shape[-1]})."
+                f"does not match action dimension ({action_dim})."
             )
         dataset_statistics["action"]["mask"] = np.array(action_normalization_mask)
 
@@ -486,20 +481,9 @@ def make_dataset_from_rlds(
     dataset = dl.DLataset.from_rlds(
         builder,
         split=split,
-        shuffle=False,
+        shuffle=shuffle,  # ope: note that shuffle here is for files, not trajs
         num_parallel_reads=num_parallel_reads,
-    )  # note that shuffle here is only for files, not for trajectories
-
-    def add_episode_id(idx: int, traj: dict) -> dict:
-        """
-        for dinov3 inference. using `is_first` from raw tfrecords before `restructure` is applied
-        """
-        traj_len = tf.shape(traj["is_first"])[0]
-        traj["episode_id"] = tf.repeat(idx, traj_len)
-        return traj
-
-    dataset = dataset.enumerate().traj_map(add_episode_id, num_parallel_calls)
-    dataset = dataset.shuffle(shuffle_buffer_size) if shuffle else dataset
+    )
     for filter_fcn_spec in filter_functions:
         dataset = dataset.filter(ModuleSpec.instantiate(filter_fcn_spec))
     if ignore_errors:
@@ -530,7 +514,7 @@ def make_single_dataset(
     dataset_kwargs: dict,
     *,
     train: bool,
-    shuffle: bool = True,
+    shuffle: bool = True,  # ope: shuffle for file reading order
     traj_transform_kwargs: dict = {},
     frame_transform_kwargs: dict = {},
 ) -> dl.DLataset:
