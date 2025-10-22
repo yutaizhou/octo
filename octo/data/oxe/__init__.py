@@ -16,6 +16,8 @@ def make_oxe_dataset_kwargs(
     load_depth: bool = False,
     load_proprio: bool = False,
     load_language: bool = True,
+    oxe_embeddings_dir: str = None,
+    load_dinov3_embeddings: bool = False,
     force_recompute_dataset_statistics: bool = False,
     action_proprio_normalization_type: NormalizationType = NormalizationType.BOUNDS,
     discount=0.98,
@@ -82,6 +84,8 @@ def make_oxe_dataset_kwargs(
         dataset_kwargs["proprio_obs_key"] = "proprio"
     if load_language:
         dataset_kwargs["language_key"] = "language_instruction"
+    if load_dinov3_embeddings:
+        dataset_kwargs["dinov3_embeddings_key"] = "dinov3_embeddings"
 
     dataset_kwargs["action_proprio_normalization_type"] = (
         action_proprio_normalization_type
@@ -100,7 +104,12 @@ def make_oxe_dataset_kwargs(
     dataset_kwargs["discount"] = discount
     dataset_kwargs["num_final_repeat"] = num_final_repeat
 
-    return {"name": name, "data_dir": data_dir, **dataset_kwargs}
+    return {
+        "name": name,
+        "data_dir": data_dir,
+        "oxe_embeddings_dir": oxe_embeddings_dir,
+        **dataset_kwargs,
+    }
 
 
 def make_oxe_dataset_kwargs_and_weights(
@@ -110,6 +119,8 @@ def make_oxe_dataset_kwargs_and_weights(
     load_depth: bool = False,
     load_proprio: bool = False,
     load_language: bool = True,
+    oxe_embeddings_dir: str = None,
+    load_dinov3_embeddings: bool = False,
     force_recompute_dataset_statistics: bool = False,
     action_proprio_normalization_type: NormalizationType = NormalizationType.NORMAL,
     discount=0.98,
@@ -155,6 +166,8 @@ def make_oxe_dataset_kwargs_and_weights(
                     load_depth,
                     load_proprio,
                     load_language,
+                    oxe_embeddings_dir,
+                    load_dinov3_embeddings,
                     force_recompute_dataset_statistics,
                     action_proprio_normalization_type,
                     discount,

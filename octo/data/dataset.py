@@ -1,8 +1,10 @@
 import json
 from functools import partial
+from pathlib import Path
 from typing import Callable, Mapping, Optional, Sequence, Tuple, Union
 
 import dlimp as dl
+import h5py
 import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
@@ -14,9 +16,11 @@ from octo.data.utils.data_utils import (
     NormalizationType,
     allocate_threads,
     get_dataset_statistics,
+    get_shard_lengths,
     normalize_action_and_proprio,
     pprint_data_mixture,
     sample_match_keys_uniform,
+    tfds_id_to_idx,
     tree_map,
 )
 from octo.utils.spec import ModuleSpec
@@ -261,6 +265,8 @@ def make_dataset_from_rlds(
     depth_obs_keys: Mapping[str, Optional[str]] = {},
     proprio_obs_key: Optional[str] = None,
     language_key: Optional[str] = None,
+    oxe_embeddings_dir: Optional[str] = None,
+    dinov3_embeddings_key: Optional[str] = None,
     action_proprio_normalization_type: NormalizationType = NormalizationType.BOUNDS,
     dataset_statistics: Optional[Union[dict, str]] = None,
     force_recompute_dataset_statistics: bool = False,
@@ -492,6 +498,34 @@ def make_dataset_from_rlds(
     dataset = dataset.traj_map(restructure, num_parallel_calls).filter(
         is_nonzero_length
     )
+
+    # ope: get precomputed embeddings
+    if dinov3_embeddings_key is not None:
+        assert oxe_embeddings_dir is not None
+        fp = Path(oxe_embeddings_dir) / name / f"{split}_embeddings.h5"
+        h5_handler = h5py.File(fp, "r")
+
+        split = "train" if train else "val"
+        shard_lengths = get_shard_lengths(builder, split)
+        n_digits = len(str(sum(shard_lengths)))
+
+        def get_dinov3_embeddings(traj):
+            def decode_and_lookup(tfds_id_bytes):
+                tfds_id: str = tfds_id_bytes.numpy().decode()
+                traj_idx: int = tfds_id_to_idx(tfds_id, shard_lengths)
+                h5_idx = f"traj_{traj_idx:0{n_digits}d}"
+                dinov3_embeddings = h5_handler[h5_idx]["dinov3_embeddings"]  # (T, D)
+                return dinov3_embeddings
+
+            dinov3_embeddings = tf.py_function(
+                decode_and_lookup, [traj["tfds_id"][0]], tf.float32
+            )
+
+            traj["embeddings"] = {}
+            traj["embeddings"]["dinov3_embeddings"] = dinov3_embeddings
+            return traj
+
+        dataset = dataset.traj_map(get_dinov3_embeddings, num_parallel_calls)
 
     if not skip_norm:
         dataset = dataset.traj_map(

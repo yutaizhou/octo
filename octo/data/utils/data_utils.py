@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from enum import Enum
 from fnmatch import fnmatch
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
@@ -9,6 +10,7 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 import dlimp as dl
 import numpy as np
 import tensorflow as tf
+import tensorflow_datasets as tfds
 import tqdm
 
 
@@ -453,3 +455,77 @@ def allocate_threads(n: Optional[int], weights: np.ndarray):
     for i in np.argsort(fractional)[::-1][: int(n)]:
         allocation[i] += 1
     return allocation
+
+
+def get_shard_lengths(builder: tfds.core.DatasetBuilder, split: str) -> List[int]:
+    """Gets the shard lengths from tfds builder"""
+    assert isinstance(split, str), f"split must be a string, got {type(split)}"
+    if split in builder.info.splits:
+        return builder.info.splits[split].shard_lengths
+    else:
+        splits = builder.info.splits[split]
+        n_shards = splits.num_shards
+        shard_lengths = [0] * n_shards
+        for i, x in enumerate(splits._file_instructions):
+            shard_lengths[i] = x.examples_in_shard
+        return shard_lengths
+
+
+def tfds_id_to_idx(tfds_id: str, shard_lengths: List[int]) -> int:
+    """
+    Converts a tfds_id to a global trajectory index (across all shards).
+    This index is meant be used with two h5 files: train/val.
+    Note that `add_tfds_id=True` is set in the `ReadConfig` when doing `builder.as_dataset` in tfds / rlds / dlimp.
+
+    Example:
+        'bridge_dataset-train.tfrecord-00850-of-01024__0' => 44154
+
+    """
+    match = re.match(r"\w+-(\w+).\w+-(\d+)-of-\d+__(\d+)", tfds_id)
+    _, shard_id, example_id = match.groups()
+    return sum(shard_lengths[: int(shard_id)]) + int(example_id)
+
+
+# first define some helper function for printing
+def pprint_dict(d, path="root", indent=0):
+    """Recursively pretty-print nested dictionaries and arrays with shapes."""
+    prefix = " " * indent
+
+    def pprint_arraylike(path, array):
+        print(f"{path}: shape={array.shape}; {array.dtype}")
+
+    if isinstance(d, dict):
+        for k, v in d.items():
+            new_path = f"{path}.{k}"
+            if isinstance(v, dict):
+                print(f"{prefix}{new_path}: (dict)")
+                pprint_dict(v, new_path, indent + 2)
+            # elif isinstance(v, (np.ndarray, list)):
+            elif hasattr(v, "shape"):
+                try:
+                    pprint_arraylike(f"{prefix}{new_path}", v)
+                except Exception:
+                    print(f"{prefix}{new_path}: list length={len(v)}")
+            else:
+                print(f"{prefix}{new_path}: {v}")
+    elif hasattr(d, "shape"):
+        pprint_arraylike(f"{prefix}", d)
+    else:
+        print("error")
+
+
+def pprint_dsdict(d):
+    print(
+        "Shape reminder:\n"
+        "\timage_*: (T or B, history, H, W, C)\n"
+        "\taction: (T or B, history, horizon, A)\n"
+    )
+    print(f"Top-level keys: {d.keys()}\n")
+
+    for k, v in d.items():
+        # if k == "next_observation":
+        #     print(f"{k} layout is same as observation")
+        #     continue
+        print(f"{k}:")
+        pprint_dict(d[k], path="", indent=2)
+        print()
