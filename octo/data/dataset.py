@@ -265,8 +265,9 @@ def make_dataset_from_rlds(
     depth_obs_keys: Mapping[str, Optional[str]] = {},
     proprio_obs_key: Optional[str] = None,
     language_key: Optional[str] = None,
-    oxe_embeddings_dir: Optional[str] = None,
-    dinov3_embeddings_key: Optional[str] = None,
+    embeddings_dir: Optional[str] = None,
+    image_embeddings_key: Optional[str] = None,
+    instruction_embeddings_key: Optional[str] = None,
     action_proprio_normalization_type: NormalizationType = NormalizationType.BOUNDS,
     dataset_statistics: Optional[Union[dict, str]] = None,
     force_recompute_dataset_statistics: bool = False,
@@ -499,33 +500,64 @@ def make_dataset_from_rlds(
         is_nonzero_length
     )
 
-    # ope: get precomputed embeddings
-    if dinov3_embeddings_key is not None:
-        assert oxe_embeddings_dir is not None
-        fp = Path(oxe_embeddings_dir) / name / f"{split}_embeddings.h5"
-        h5_handler = h5py.File(fp, "r")
+    # * ope: get precomputed embeddings
+    # for image (dinov3) and instruction (minilm)
+    if embeddings_dir is not None:
+        assert image_embeddings_key in ["dinov3_embeddings"]
+        assert instruction_embeddings_key in ["minilm_embeddings"]
+        split = "train" if train else "val"  # todo: is this correct?
+        common_fp = f"{name}/{split}_embeddings.h5"
+        fp_img = Path(embeddings_dir) / "oxe_dinov3_embeddings" / common_fp
+        fp_lang = Path(embeddings_dir) / "oxe_minilm_embeddings" / common_fp
+        h5_handler_img = h5py.File(fp_img, "r")
+        h5_handler_lang = h5py.File(fp_lang, "r")
 
-        split = "train" if train else "val"
         shard_lengths = get_shard_lengths(builder, split)
         n_digits = len(str(sum(shard_lengths)))
 
-        def get_dinov3_embeddings(traj):
-            def decode_and_lookup(tfds_id_bytes):
+        def get_embeddings(traj):
+            # def retrieve_img(tfds_id_bytes):
+            #     tfds_id: str = tfds_id_bytes.numpy().decode()
+            #     traj_idx: int = tfds_id_to_idx(tfds_id, shard_lengths)
+            #     h5_idx = f"traj_{traj_idx:0{n_digits}d}"
+            #     img_embeddings = h5_handler_img[h5_idx]["dinov3_embeddings"][:]
+            #     return img_embeddings  # (T, D)
+
+            # def retrieve_lang(tfds_id_bytes):
+            #     tfds_id: str = tfds_id_bytes.numpy().decode()
+            #     traj_idx: int = tfds_id_to_idx(tfds_id, shard_lengths)
+            #     h5_idx = f"traj_{traj_idx:0{n_digits}d}"
+            #     lang_embeddings = h5_handler_lang[h5_idx]["minilm_embeddings"][:]
+            #     return lang_embeddings[None, :]  # (1, D)
+
+            # img_embd = tf.py_function(retrieve_img, [traj["tfds_id"][0]], tf.float32)
+            # lang_embd = tf.py_function(retrieve_lang, [traj["tfds_id"][0]], tf.float32)
+            # lang_embd = tf.repeat(lang_embd, tf.shape(img_embd)[0], axis=0)  # (T, D)
+
+            def retrieve(tfds_id_bytes):
+                # get h5 traj key
                 tfds_id: str = tfds_id_bytes.numpy().decode()
                 traj_idx: int = tfds_id_to_idx(tfds_id, shard_lengths)
-                h5_idx = f"traj_{traj_idx:0{n_digits}d}"
-                dinov3_embeddings = h5_handler[h5_idx]["dinov3_embeddings"]  # (T, D)
-                return dinov3_embeddings
+                key: str = f"traj_{traj_idx:0{n_digits}d}"
 
-            dinov3_embeddings = tf.py_function(
-                decode_and_lookup, [traj["tfds_id"][0]], tf.float32
+                # get embeddings, concat them
+                img_embd = h5_handler_img[key]["dinov3_embeddings"][:]  # (T, Dimg)
+                T, img_dim = img_embd.shape
+                lang_embd = h5_handler_lang[key]["minilm_embeddings"][:][None, :]
+                lang_embd = tf.repeat(lang_embd, T, axis=0)  # (T, Dlang)
+
+                embd = tf.concat([img_embd, lang_embd], axis=-1)  # (T, Dimg + Dlang)
+                return embd, img_dim
+
+            embd, img_dim = tf.py_function(
+                retrieve, [traj["tfds_id"][0]], (tf.float32, tf.int32)
             )
-
             traj["embeddings"] = {}
-            traj["embeddings"]["dinov3_embeddings"] = dinov3_embeddings
+            traj["embeddings"]["image_primary"] = embd[:, :img_dim]
+            traj["embeddings"]["instruction"] = embd[:, img_dim:]
             return traj
 
-        dataset = dataset.traj_map(get_dinov3_embeddings, num_parallel_calls)
+        dataset = dataset.traj_map(get_embeddings, num_parallel_calls)
 
     if not skip_norm:
         dataset = dataset.traj_map(
