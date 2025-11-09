@@ -1,6 +1,6 @@
 import copy
 import logging
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from octo.data.oxe.oxe_dataset_configs import OXE_DATASET_CONFIGS, ActionEncoding
 from octo.data.oxe.oxe_dataset_mixes import OXE_NAMED_MIXES
@@ -16,9 +16,9 @@ def make_oxe_dataset_kwargs(
     load_depth: bool = False,
     load_proprio: bool = False,
     load_language: bool = True,
-    embeddings_dir: str = None,
-    load_image_embeddings: bool = False,
-    load_instruction_embeddings: bool = False,
+    load_next: bool = False,  # for offlineRL, popped later
+    embeddings_dir: Optional[str] = None,  # ../oxe_embeddings
+    target_actions_dir: Optional[str] = None,  # ../oxe_actions/target_policy_name
     force_recompute_dataset_statistics: bool = False,
     action_proprio_normalization_type: NormalizationType = NormalizationType.BOUNDS,
     discount=0.98,
@@ -85,10 +85,6 @@ def make_oxe_dataset_kwargs(
         dataset_kwargs["proprio_obs_key"] = "proprio"
     if load_language:
         dataset_kwargs["language_key"] = "language_instruction"
-    if load_image_embeddings:
-        dataset_kwargs["image_embeddings_key"] = "dinov3_embeddings"
-    if load_instruction_embeddings:
-        dataset_kwargs["instruction_embeddings_key"] = "minilm_embeddings"
 
     dataset_kwargs["action_proprio_normalization_type"] = (
         action_proprio_normalization_type
@@ -110,7 +106,9 @@ def make_oxe_dataset_kwargs(
     return {
         "name": name,
         "data_dir": data_dir,
+        "load_next": load_next,  # for offlineRL, popped later
         "embeddings_dir": embeddings_dir,
+        "target_actions_dir": target_actions_dir,
         **dataset_kwargs,
     }
 
@@ -122,9 +120,9 @@ def make_oxe_dataset_kwargs_and_weights(
     load_depth: bool = False,
     load_proprio: bool = False,
     load_language: bool = True,
-    embeddings_dir: str = None,
-    load_image_embeddings: bool = False,
-    load_instruction_embeddings: bool = False,
+    load_next: bool = False,  # for offlineRL, popped later
+    embeddings_dir: Optional[str] = None,  # ../oxe_embeddings
+    target_actions_dir: Optional[str] = None,  # ../oxe_actions/target_policy_name
     force_recompute_dataset_statistics: bool = False,
     action_proprio_normalization_type: NormalizationType = NormalizationType.NORMAL,
     discount=0.98,
@@ -170,9 +168,9 @@ def make_oxe_dataset_kwargs_and_weights(
                     load_depth=load_depth,
                     load_proprio=load_proprio,
                     load_language=load_language,
+                    load_next=load_next,
                     embeddings_dir=embeddings_dir,
-                    load_image_embeddings=load_image_embeddings,
-                    load_instruction_embeddings=load_instruction_embeddings,
+                    target_actions_dir=target_actions_dir,
                     force_recompute_dataset_statistics=force_recompute_dataset_statistics,
                     action_proprio_normalization_type=action_proprio_normalization_type,
                     discount=discount,

@@ -30,6 +30,7 @@ def apply_trajectory_transforms(
     dataset: dl.DLataset,
     *,
     train: bool,
+    load_next: bool = False,  # v-gps: for offline RL training (s,a,r,s',a')
     goal_relabeling_strategy: Optional[str] = None,
     goal_relabeling_kwargs: dict = {},
     window_size: int = 1,
@@ -167,9 +168,15 @@ def apply_trajectory_transforms(
         traj["next_observation"] = tf.nest.map_structure(
             lambda x: tf.gather(x, indices), traj["observation"]
         )
+        traj["embeddings"]["next_image_primary"] = tf.gather(
+            traj["embeddings"]["image_primary"], indices
+        )
+        if "target_actions" in traj:
+            traj["next_target_actions"] = tf.gather(traj["target_actions"], indices)
         return traj
 
-    dataset = dataset.traj_map(add_next_act_obs, num_parallel_calls)
+    if load_next:
+        dataset = dataset.traj_map(add_next_act_obs, num_parallel_calls)
 
     return dataset
 
@@ -178,6 +185,7 @@ def apply_frame_transforms(
     dataset: dl.DLataset,
     *,
     train: bool,
+    load_next: bool = False,  # v-gps: for offline RL training (s,a,r,s',a')
     image_augment_kwargs: Union[dict, Mapping[str, dict]] = {},
     resize_size: Union[Tuple[int, int], Mapping[str, Tuple[int, int]]] = {},
     depth_resize_size: Union[Tuple[int, int], Mapping[str, Tuple[int, int]]] = {},
@@ -216,7 +224,8 @@ def apply_frame_transforms(
         frame["task"] = fn(frame["task"])
         # observation is chunked -- apply fn along first axis
         frame["observation"] = dl.vmap(fn)(frame["observation"])
-        frame["next_observation"] = dl.vmap(fn)(frame["next_observation"])
+        if load_next:
+            frame["next_observation"] = dl.vmap(fn)(frame["next_observation"])
         return frame
 
     # decode + resize images (and depth images)
@@ -266,8 +275,7 @@ def make_dataset_from_rlds(
     proprio_obs_key: Optional[str] = None,
     language_key: Optional[str] = None,
     embeddings_dir: Optional[str] = None,
-    image_embeddings_key: Optional[str] = None,
-    instruction_embeddings_key: Optional[str] = None,
+    target_actions_dir: Optional[str] = None,
     action_proprio_normalization_type: NormalizationType = NormalizationType.BOUNDS,
     dataset_statistics: Optional[Union[dict, str]] = None,
     force_recompute_dataset_statistics: bool = False,
@@ -392,6 +400,7 @@ def make_dataset_from_rlds(
                 )
 
         # v-gps: reward, td_mask, mc_return for offline RL training
+        # uses {-1, 0} reward for offline RL training
         num_pos = tf.minimum(num_final_repeat, traj_len)
         reward = tf.concat(
             [
@@ -484,6 +493,8 @@ def make_dataset_from_rlds(
         split = "train[:95%]" if train else "train[95%:]"
     else:
         split = "train" if train else "val"
+    # if not train and name == "fractal20220817_data":
+    #     split = "train"  # hack for train_callbacks.create_validation_dataset
 
     dataset = dl.DLataset.from_rlds(
         builder,
@@ -500,12 +511,13 @@ def make_dataset_from_rlds(
         is_nonzero_length
     )
 
-    # * ope: get precomputed embeddings
+    # * ope: get precomputed embeddings and target actions
     # for image (dinov3) and instruction (minilm)
+    split = "train" if train else "val"  # todo: is this correct?
+    if not train and name == "fractal20220817_data":
+        split = "train"  # stupid hack for train_callbacks.create_validation_dataset
+
     if embeddings_dir is not None:
-        assert image_embeddings_key in ["dinov3_embeddings"]
-        assert instruction_embeddings_key in ["minilm_embeddings"]
-        split = "train" if train else "val"  # todo: is this correct?
         common_fp = f"{name}/{split}_embeddings.h5"
         fp_img = Path(embeddings_dir) / "oxe_dinov3_embeddings" / common_fp
         fp_lang = Path(embeddings_dir) / "oxe_minilm_embeddings" / common_fp
@@ -516,24 +528,6 @@ def make_dataset_from_rlds(
         n_digits = len(str(sum(shard_lengths)))
 
         def get_embeddings(traj):
-            # def retrieve_img(tfds_id_bytes):
-            #     tfds_id: str = tfds_id_bytes.numpy().decode()
-            #     traj_idx: int = tfds_id_to_idx(tfds_id, shard_lengths)
-            #     h5_idx = f"traj_{traj_idx:0{n_digits}d}"
-            #     img_embeddings = h5_handler_img[h5_idx]["dinov3_embeddings"][:]
-            #     return img_embeddings  # (T, D)
-
-            # def retrieve_lang(tfds_id_bytes):
-            #     tfds_id: str = tfds_id_bytes.numpy().decode()
-            #     traj_idx: int = tfds_id_to_idx(tfds_id, shard_lengths)
-            #     h5_idx = f"traj_{traj_idx:0{n_digits}d}"
-            #     lang_embeddings = h5_handler_lang[h5_idx]["minilm_embeddings"][:]
-            #     return lang_embeddings[None, :]  # (1, D)
-
-            # img_embd = tf.py_function(retrieve_img, [traj["tfds_id"][0]], tf.float32)
-            # lang_embd = tf.py_function(retrieve_lang, [traj["tfds_id"][0]], tf.float32)
-            # lang_embd = tf.repeat(lang_embd, tf.shape(img_embd)[0], axis=0)  # (T, D)
-
             def retrieve(tfds_id_bytes):
                 # get h5 traj key
                 tfds_id: str = tfds_id_bytes.numpy().decode()
@@ -559,6 +553,28 @@ def make_dataset_from_rlds(
 
         dataset = dataset.traj_map(get_embeddings, num_parallel_calls)
 
+    if target_actions_dir is not None:
+        common_fp = f"{name}/{split}_actions.h5"
+        fp_acts = Path(target_actions_dir) / common_fp
+        h5_handler_actions = h5py.File(fp_acts, "r")
+
+        shard_lengths = get_shard_lengths(builder, split)
+        n_digits = len(str(sum(shard_lengths)))
+
+        def get_target_actions(traj):
+            def retrieve(tfds_id_bytes):
+                tfds_id: str = tfds_id_bytes.numpy().decode()
+                traj_idx: int = tfds_id_to_idx(tfds_id, shard_lengths)
+                key: str = f"traj_{traj_idx:0{n_digits}d}"
+                actions = h5_handler_actions[key]["actions"][:]
+                return actions
+
+            actions = tf.py_function(retrieve, [traj["tfds_id"][0]], tf.float32)
+            traj["target_actions"] = actions
+            return traj
+
+        dataset = dataset.traj_map(get_target_actions, num_parallel_calls)
+
     if not skip_norm:
         dataset = dataset.traj_map(
             partial(
@@ -580,7 +596,6 @@ def make_single_dataset(
     dataset_kwargs: dict,
     *,
     train: bool,
-    shuffle: bool = True,  # ope: shuffle for file reading order
     traj_transform_kwargs: dict = {},
     frame_transform_kwargs: dict = {},
 ) -> dl.DLataset:
@@ -592,10 +607,14 @@ def make_single_dataset(
         traj_transform_kwargs: kwargs passed to 'apply_trajectory_transforms'.
         frame_transform_kwargs: kwargs passed to 'get_frame_transforms'.
     """
+    load_next = dataset_kwargs.pop("load_next", False)
+    if load_next:
+        traj_transform_kwargs.update({"load_next": load_next})
+        frame_transform_kwargs.update({"load_next": load_next})
+
     dataset, dataset_statistics = make_dataset_from_rlds(
         **dataset_kwargs,
         train=train,
-        shuffle=shuffle,
     )
     dataset = apply_trajectory_transforms(dataset, **traj_transform_kwargs, train=train)
     dataset = apply_frame_transforms(dataset, **frame_transform_kwargs, train=train)
@@ -654,7 +673,9 @@ def make_interleaved_dataset(
     # go through datasets once to get sizes
     dataset_sizes = []
     all_dataset_statistics = {}
+    load_next = None
     for dataset_kwargs in dataset_kwargs_list:
+        load_next = dataset_kwargs.pop("load_next", False)
         _, dataset_statistics = make_dataset_from_rlds(**dataset_kwargs, train=train)
         dataset_sizes.append(dataset_statistics["num_transitions"])
         assert dataset_kwargs["name"] not in all_dataset_statistics, (
@@ -675,6 +696,9 @@ def make_interleaved_dataset(
     logging.info("Threads per dataset: %s", threads_per_dataset)
     logging.info("Reads per dataset: %s", reads_per_dataset)
 
+    if load_next is not None:
+        traj_transform_kwargs.update({"load_next": load_next})
+        frame_transform_kwargs.update({"load_next": load_next})
     # construct datasets
     datasets = []
     for dataset_kwargs, threads, reads in zip(
@@ -717,4 +741,5 @@ def make_interleaved_dataset(
     # save for later
     dataset.dataset_statistics = all_dataset_statistics
     dataset.sample_weights = sample_weights
+    return dataset
     return dataset
